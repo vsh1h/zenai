@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+supabase
+pydantic
+rapidfuzz
+python-dotenv
+email-validator
+httpx
