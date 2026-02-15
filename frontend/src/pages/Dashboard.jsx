@@ -1,10 +1,10 @@
 import React from 'react';
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db/db";
-import { 
-  TrendingUp, 
-  Users, 
-  Zap, 
+import {
+  TrendingUp,
+  Users,
+  Zap,
   CheckCircle2,
   ArrowRight,
   MoreVertical,
@@ -12,7 +12,10 @@ import {
   CloudOff,
   RefreshCw,
   Monitor,
-  Smartphone
+  Smartphone,
+  DollarSign,
+  PieChart,
+  Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -21,18 +24,33 @@ import SyncStatusPanel from '../components/SyncStatusPanel';
 const Dashboard = ({ onViewLead }) => {
   const leads = useLiveQuery(() => db.leads_local.toArray());
   const pendingSync = useLiveQuery(() => db.sync_queue.where('status').equals('pending').count());
-  const recentLeads = useLiveQuery(() => 
+  const recentLeads = useLiveQuery(() =>
     db.leads_local.orderBy('timestamp').reverse().limit(5).toArray()
   );
 
   const stats = [
     { label: 'Total Leads', value: leads?.length || 0, icon: Users, color: 'var(--primary)' },
     { label: 'Pending Sync', value: pendingSync || 0, icon: CloudOff, color: 'var(--warning)' },
-    { label: 'Captured Today', value: leads?.filter(l => {
-      const today = new Date().toDateString();
-      return new Date(l.timestamp).toDateString() === today;
-    }).length || 0, icon: TrendingUp, color: 'var(--accent)' },
+    {
+      label: 'Captured Today', value: leads?.filter(l => {
+        const today = new Date().toDateString();
+        return new Date(l.timestamp).toDateString() === today;
+      }).length || 0, icon: TrendingUp, color: 'var(--accent)'
+    },
     { label: 'Met Lead', value: leads?.filter(l => l.status === 'Met').length || 0, icon: CheckCircle2, color: 'var(--secondary)' },
+    { label: 'Overdue Follow-ups', value: leads?.filter(l => l.status === 'Follow-up' && l.reminder_date && new Date(l.reminder_date) < new Date()).length || 0, icon: Clock, color: 'var(--danger)' },
+    {
+      label: 'Conference ROI',
+      value: (() => {
+        const wonLeads = leads?.filter(l => l.status === 'Won') || [];
+        const totalRevenue = wonLeads.reduce((acc, lead) => acc + (parseFloat(lead.revenue) || 0), 0);
+        const mockCost = 50000; // Mocked cost for ROI visualization
+        const roi = mockCost > 0 ? ((totalRevenue - mockCost) / mockCost) * 100 : 0;
+        return `${totalRevenue > 0 ? totalRevenue.toLocaleString() : '0'} L / ${roi.toFixed(1)}%`;
+      })(),
+      icon: DollarSign,
+      color: 'var(--accent)'
+    },
   ];
 
   return (
@@ -50,10 +68,10 @@ const Dashboard = ({ onViewLead }) => {
         </div>
       </header>
 
-     
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
         gap: '1.5rem',
         marginBottom: '3rem'
       }}>
@@ -62,7 +80,7 @@ const Dashboard = ({ onViewLead }) => {
           return (
             <div key={i} className="card glass" style={{ position: 'relative', overflow: 'hidden' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', position: 'relative', zIndex: 1 }}>
-                <div style={{ 
+                <div style={{
                   background: `rgba(${stat.color === 'var(--primary)' ? '37, 99, 235' : stat.color === 'var(--warning)' ? '217, 119, 6' : stat.color === 'var(--accent)' ? '5, 150, 105' : '79, 70, 229'}, 0.1)`,
                   padding: '0.75rem',
                   borderRadius: '12px',
@@ -89,24 +107,24 @@ const Dashboard = ({ onViewLead }) => {
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Recent Interactions</h3>
             <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.5rem 1rem' }}>View Pipeline <ArrowRight size={14} /></button>
           </div>
-          
+
           <div className="leads-list">
             {recentLeads?.length > 0 ? recentLeads.map((lead) => (
-              <div key={lead.client_uuid} 
+              <div key={lead.client_uuid}
                 onClick={() => onViewLead && onViewLead(lead.client_uuid)}
-                style={{ 
-                padding: '1.2rem 0', 
-                borderBottom: '1px solid var(--border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer'
-              }}>
+                style={{
+                  padding: '1.2rem 0',
+                  borderBottom: '1px solid var(--border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer'
+                }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
-                  <div style={{ 
-                    width: '45px', 
-                    height: '45px', 
-                    borderRadius: '12px', 
+                  <div style={{
+                    width: '45px',
+                    height: '45px',
+                    borderRadius: '12px',
                     background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)',
                     display: 'flex',
                     alignItems: 'center',
@@ -123,10 +141,15 @@ const Dashboard = ({ onViewLead }) => {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <span className={`badge badge-${lead.mode === 'stall' ? 'blue' : 'warning'}`} style={{ textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
-                    {lead.mode}
-                  </span>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.4rem' }}>
+                  <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'flex-end', marginBottom: '0.4rem' }}>
+                    {lead.sync_status === 'pending' && (
+                      <span className="badge" style={{ background: 'var(--warning)', color: 'white', fontSize: '0.6rem', padding: '0.2rem 0.5rem' }}>SYNC PENDING</span>
+                    )}
+                    <span className={`badge badge-${lead.mode === 'stall' ? 'blue' : 'warning'}`} style={{ textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
+                      {lead.mode}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
                     {format(new Date(lead.timestamp), 'MMM dd, HH:mm')}
                   </p>
                 </div>
@@ -159,7 +182,7 @@ const Dashboard = ({ onViewLead }) => {
           </div>
         </div>
       </div>
-      
+
       <style>{`
         .hover-effect:hover {
           border-color: var(--primary) !important;

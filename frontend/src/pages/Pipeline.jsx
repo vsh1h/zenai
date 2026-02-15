@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db/db";
-import { 
-  MoreHorizontal, 
-  MapPin, 
-  Calendar, 
-  User, 
+import {
+  MoreHorizontal,
+  MapPin,
+  Calendar,
+  User,
   Zap,
   Tag,
   ArrowRightLeft
@@ -17,14 +17,14 @@ const STAGES = ['Met', 'Follow-up', 'Engaged', 'Meeting', 'Outcome'];
 const Pipeline = ({ onSelectLead }) => {
   const leads = useLiveQuery(() => db.leads_local.toArray()) || [];
   const [draggedLead, setDraggedLead] = useState(null);
-  
+
   const moveLead = async (client_uuid, newStatus) => {
     const timestamp = new Date().toISOString();
-    
+
     // Update local lead
-    await db.leads_local.where('client_uuid').equals(client_uuid).modify({ 
+    await db.leads_local.where('client_uuid').equals(client_uuid).modify({
       status: newStatus,
-      timestamp 
+      timestamp
     });
 
     // Log interaction
@@ -58,6 +58,10 @@ const Pipeline = ({ onSelectLead }) => {
   const handleDrop = (e, stage) => {
     e.preventDefault();
     if (draggedLead && draggedLead.status !== stage) {
+      if (stage === 'Follow-up' && !draggedLead.reminder_date) {
+        alert("Action Required: Please set a Follow-up Date in the lead details before moving to this stage.");
+        return;
+      }
       moveLead(draggedLead.client_uuid, stage);
     }
     setDraggedLead(null);
@@ -72,31 +76,31 @@ const Pipeline = ({ onSelectLead }) => {
         <p style={{ color: 'var(--text-muted)' }}>Drag and drop cards across stages to update status.</p>
       </header>
 
-      <div style={{ 
-        display: 'flex', 
-        gap: '1.25rem', 
-        overflowX: 'auto', 
+      <div style={{
+        display: 'flex',
+        gap: '1.25rem',
+        overflowX: 'auto',
         paddingBottom: '1.5rem',
         flex: 1,
         alignItems: 'stretch'
       }}>
         {STAGES.map(stage => (
-          <div 
-            key={stage} 
+          <div
+            key={stage}
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, stage)}
-            style={{ 
-              minWidth: '320px', 
-              background: 'rgba(0, 0, 0, 0.01)', 
-              borderRadius: '20px', 
-              display: 'flex', 
+            style={{
+              minWidth: '320px',
+              background: 'rgba(0, 0, 0, 0.01)',
+              borderRadius: '20px',
+              display: 'flex',
               flexDirection: 'column',
               border: '1px solid var(--border)',
               transition: 'background 0.3s ease'
             }}
           >
-            <div style={{ 
-              padding: '1.25rem 1.5rem', 
+            <div style={{
+              padding: '1.25rem 1.5rem',
               borderBottom: '1px solid var(--border)',
               display: 'flex',
               justifyContent: 'space-between',
@@ -116,14 +120,14 @@ const Pipeline = ({ onSelectLead }) => {
 
             <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {getLeadsInStage(stage).map(lead => (
-                <div 
-                  key={lead.client_uuid} 
+                <div
+                  key={lead.client_uuid}
                   draggable
                   onDragStart={() => handleDragStart(lead)}
-                  className="card glass kanban-card" 
+                  className="card glass kanban-card"
                   onClick={() => onSelectLead && onSelectLead(lead.client_uuid)}
-                  style={{ 
-                    padding: '1.5rem', 
+                  style={{
+                    padding: '1.5rem',
                     cursor: 'grab',
                     borderColor: 'rgba(255, 255, 255, 0.05)',
                     position: 'relative'
@@ -131,11 +135,16 @@ const Pipeline = ({ onSelectLead }) => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                     <h4 style={{ fontWeight: 700, fontSize: '1.1rem' }}>{lead.name}</h4>
-                    <span className={`badge badge-${lead.mode === 'stall' ? 'blue' : 'warning'}`} style={{ fontSize: '0.7rem', fontWeight: 800 }}>
-                      {lead.mode}
-                    </span>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      {lead.status === 'Follow-up' && lead.reminder_date && new Date(lead.reminder_date) < new Date() && (
+                        <span className="badge" style={{ background: 'var(--danger)', color: 'white', fontSize: '0.7rem', fontWeight: 800 }}>OVERDUE</span>
+                      )}
+                      <span className={`badge badge-${lead.mode === 'stall' ? 'blue' : 'warning'}`} style={{ fontSize: '0.7rem', fontWeight: 800 }}>
+                        {lead.mode}
+                      </span>
+                    </div>
                   </div>
-                  
+
                   <div style={{ display: 'grid', gap: '0.6rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                       <Tag size={14} color="var(--primary)" />
@@ -152,13 +161,13 @@ const Pipeline = ({ onSelectLead }) => {
                       {lead.notes}
                     </p>
                   )}
-                  
+
                   <div style={{ position: 'absolute', right: '1rem', bottom: '1rem', opacity: 0.3 }}>
                     <ArrowRightLeft size={16} />
                   </div>
                 </div>
               ))}
-              
+
               {getLeadsInStage(stage).length === 0 && (
                 <div style={{ textAlign: 'center', padding: '3rem', border: '2px dashed var(--border)', borderRadius: '20px', opacity: 0.3 }}>
                   <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>Drop leads here</p>

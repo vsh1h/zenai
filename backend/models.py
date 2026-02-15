@@ -13,6 +13,10 @@ class LeadBase(BaseModel):
     location: Optional[str] = None
     intent: Optional[str] = None
     status: Optional[str] = "New"
+    reminder_date: Optional[datetime] = None
+    owner_id: Optional[uuid.UUID] = None
+    revenue: Optional[float] = 0.0
+    conference_id: Optional[uuid.UUID] = None
     captured_at: Optional[datetime] = None
     social_media: Optional[Dict[str, str]] = Field(default_factory=dict)
     meta_data: Optional[Dict[str, Any]] = Field(default_factory=dict)

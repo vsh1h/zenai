@@ -7,12 +7,16 @@ create table public.leads (
   company text,
   role text,
   notes text,
-  status text check (status in ('New', 'Contacted', 'Qualified', 'Lost', 'Meeting', 'Won', 'Met')) default 'New',
+  status text check (status in ('New', 'Contacted', 'Qualified', 'Lost', 'Meeting', 'Won', 'Met', 'Follow-up', 'Engaged', 'Outcome')) default 'New',
+  reminder_date timestamptz,
+  owner_id uuid,
   captured_at timestamptz default now(), 
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   social_media_json jsonb default '{}'::jsonb, 
   meta_data jsonb default '{}'::jsonb, 
+  revenue numeric default 0,
+  conference_id uuid,
   
   
   constraint leads_email_unique unique (email)
@@ -28,6 +32,7 @@ create table public.interactions (
   
   
   recording_url text,
+  meta_data jsonb default '{}'::jsonb,
   
   created_at timestamptz default now()
 );
@@ -51,3 +56,12 @@ create policy "Enable access for service role" on public.interactions
     to service_role
     using (true)
     with check (true);
+create table public.conferences (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  cost numeric not null,
+  date timestamptz default now()
+);
+
+alter table public.conferences enable row level security;
+create policy "Enable access for service role" on public.conferences as permissive for all to service_role using (true) with check (true);

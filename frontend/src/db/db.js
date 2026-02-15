@@ -3,12 +3,13 @@ import Dexie from 'dexie';
 export const db = new Dexie('FinIdeasDB');
 
 
-db.version(2).stores({
-  leads_local: '++id, client_uuid, name, email, phone, status, source, mode, sync_status, timestamp',
+db.version(6).stores({
+  leads_local: '++id, client_uuid, name, email, phone, status, source, mode, sync_status, timestamp, reminder_date, owner_id, revenue, conference_id',
   interactions_local: '++id, client_uuid, lead_uuid, type, timestamp, note, mode, sync_status',
   sync_queue: '++id, type, table, data, timestamp, status',
   reminders_local: '++id, client_uuid, lead_uuid, title, timestamp, sync_status',
-  settings: 'key, value'
+  settings: 'key, value',
+  media_local: '++id, client_uuid, file_name, blob, type, timestamp'
 });
 
 

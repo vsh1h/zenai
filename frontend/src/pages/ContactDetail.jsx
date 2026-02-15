@@ -1,28 +1,34 @@
 import React from 'react';
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db/db";
-import { 
-  User, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Clock, 
-  CheckCircle2, 
-  MessageSquare, 
-  Mic, 
+import {
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Clock,
+  CheckCircle2,
+  MessageSquare,
+  Mic,
   Share2,
   ChevronLeft,
   Calendar,
   Tag,
   Zap,
-  ArrowRightLeft
+  ArrowRightLeft,
+  RefreshCw
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+const CURRENT_USER_ID = "00000000-0000-0000-0000-000000000000";
+
 const ContactDetail = ({ client_uuid, onBack }) => {
   const lead = useLiveQuery(() => db.leads_local.where('client_uuid').equals(client_uuid).first());
-  const interactions = useLiveQuery(() => 
+  const interactions = useLiveQuery(() =>
     db.interactions_local.where('lead_uuid').equals(client_uuid).reverse().toArray()
+  );
+  const audioNotes = useLiveQuery(() =>
+    db.media_local.where('client_uuid').equals(client_uuid).reverse().toArray()
   );
 
   if (!lead) return <div className="card glass">Loading Lead Intelligence...</div>;
@@ -37,10 +43,10 @@ const ContactDetail = ({ client_uuid, onBack }) => {
         {/* Left Column: Profile */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div className="card glass" style={{ padding: '2rem', textAlign: 'center' }}>
-            <div style={{ 
-              width: '100px', 
-              height: '100px', 
-              borderRadius: '25px', 
+            <div style={{
+              width: '100px',
+              height: '100px',
+              borderRadius: '25px',
               background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)',
               margin: '0 auto 1.5rem',
               display: 'flex',
@@ -54,11 +60,43 @@ const ContactDetail = ({ client_uuid, onBack }) => {
               {lead.name[0]}
             </div>
             <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.5rem' }}>{lead.name}</h2>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' }}>
               <span className={`badge badge-${lead.mode === 'stall' ? 'blue' : 'warning'}`}>{lead.mode.toUpperCase()}</span>
               <span className="badge badge-accent">{lead.status.toUpperCase()}</span>
+              {lead.status === 'Follow-up' && lead.reminder_date && new Date(lead.reminder_date) < new Date() && (
+                <span className="badge" style={{ background: 'var(--danger)', color: 'white', fontWeight: 800 }}>OVERDUE</span>
+              )}
+              {lead.meta_data && (lead.meta_data.is_hot || lead.meta_data.priority_score > 75) && (
+                <span className="badge" style={{ background: '#f43f5e', color: 'white', fontWeight: 800 }}>🔥 HOT LEAD</span>
+              )}
+              <span className="badge" style={{ background: lead.owner_id === CURRENT_USER_ID ? 'var(--primary)' : 'var(--text-dim)', color: 'white', fontWeight: 800 }}>
+                {lead.owner_id === CURRENT_USER_ID ? 'OWNER' : 'VIEWER'}
+              </span>
             </div>
-            
+
+            {lead.meta_data && lead.meta_data.meeting_link && (
+              <a
+                href={lead.meta_data.meeting_link}
+                target="_blank"
+                rel="noreferrer"
+                className={`btn btn-primary ${lead.owner_id !== CURRENT_USER_ID ? 'btn-disabled' : ''}`}
+                style={{
+                  width: '100%',
+                  marginBottom: '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  background: lead.owner_id === CURRENT_USER_ID ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'var(--glass-bg)',
+                  border: 'none',
+                  pointerEvents: lead.owner_id === CURRENT_USER_ID ? 'auto' : 'none',
+                  opacity: lead.owner_id === CURRENT_USER_ID ? 1 : 0.5
+                }}
+              >
+                Join Meeting
+              </a>
+            )}
+
             <div style={{ textAlign: 'left', display: 'grid', gap: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: 'var(--text-muted)' }}>
                 <Phone size={18} color="var(--primary)" />
@@ -86,9 +124,25 @@ const ContactDetail = ({ client_uuid, onBack }) => {
                 <span style={{ color: 'var(--text-dim)' }}>Source Badge</span>
                 <span style={{ fontWeight: 600 }}>{lead.source}</span>
               </div>
+              {lead.meta_data && lead.meta_data.priority_score && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>Priority Score</span>
+                  <span style={{ fontWeight: 800, color: lead.meta_data.priority_score > 75 ? '#f43f5e' : 'var(--primary)' }}>
+                    {lead.meta_data.priority_score}/100
+                  </span>
+                </div>
+              )}
+              {lead.revenue > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>Closed Revenue</span>
+                  <span style={{ fontWeight: 800, color: 'var(--accent)' }}>
+                    {lead.revenue} L
+                  </span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                 <span style={{ color: 'var(--text-dim)' }}>Owner Badge</span>
-                <span style={{ fontWeight: 600 }}>Sales Team A</span>
+                <span style={{ fontWeight: 600 }}>{lead.owner_id === CURRENT_USER_ID ? 'You (Sales Team A)' : 'Other Agent'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                 <span style={{ color: 'var(--text-dim)' }}>Recorded On</span>
@@ -103,38 +157,56 @@ const ContactDetail = ({ client_uuid, onBack }) => {
           <div className="card glass" style={{ flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <h3 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Interaction <span className="text-gradient">Timeline</span></h3>
-              <button className="btn btn-primary" style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}>Add Note</button>
+              <button
+                className="btn btn-primary"
+                style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                disabled={lead.owner_id !== CURRENT_USER_ID}
+              >
+                Add Note
+              </button>
             </div>
 
             <div style={{ position: 'relative', paddingLeft: '2rem' }}>
               {/* Timeline Line */}
-              <div style={{ 
-                position: 'absolute', 
-                left: '7px', 
-                top: '0', 
-                bottom: '0', 
-                width: '2px', 
-                background: 'linear-gradient(to bottom, var(--primary), var(--border))' 
+              <div style={{
+                position: 'absolute',
+                left: '7px',
+                top: '0',
+                bottom: '0',
+                width: '2px',
+                background: 'linear-gradient(to bottom, var(--primary), var(--border))'
               }}></div>
 
-             
+
               <div style={{ position: 'relative', marginBottom: '2.5rem' }}>
-                <div style={{ 
-                  position: 'absolute', 
-                  left: '-26px', 
-                  top: '0', 
-                  width: '16px', 
-                  height: '16px', 
-                  borderRadius: '50%', 
+                <div style={{
+                  position: 'absolute',
+                  left: '-26px',
+                  top: '0',
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
                   background: 'var(--primary)',
                   border: '4px solid var(--bg-dark)'
                 }}></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                   <h4 style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Zap size={16} color="var(--primary)" fill="var(--primary)" /> 
+                    <Zap size={16} color="var(--primary)" fill="var(--primary)" />
                     Lead Captured (Met)
                   </h4>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{format(new Date(lead.timestamp), 'HH:mm')}</span>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'flex-end', marginBottom: '0.4rem' }}>
+                      {lead.sync_status === 'pending' && (
+                        <span className="badge" style={{ background: 'var(--warning)', color: 'white', fontSize: '0.6rem', padding: '0.2rem 0.5rem' }}>SYNC PENDING</span>
+                      )}
+                      <span className={`badge badge-${lead.mode === 'stall' ? 'blue' : 'warning'}`} style={{ textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
+                        {lead.mode}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                      {format(new Date(lead.timestamp), 'MMM dd, HH:mm')}
+                    </p>
+                  </div>
                 </div>
                 <div className="card glass" style={{ padding: '1.25rem', background: 'rgba(255,255,255,0.02)' }}>
                   <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>{lead.notes || 'No description provided at capture.'}</p>
@@ -142,15 +214,15 @@ const ContactDetail = ({ client_uuid, onBack }) => {
               </div>
 
               {/* Interaction Logs */}
-              {interactions.map((interaction, idx) => (
+              {interactions && interactions.map((interaction, idx) => (
                 <div key={interaction.id || idx} style={{ position: 'relative', marginBottom: '2.5rem' }}>
-                  <div style={{ 
-                    position: 'absolute', 
-                    left: '-26px', 
-                    top: '0', 
-                    width: '16px', 
-                    height: '16px', 
-                    borderRadius: '50%', 
+                  <div style={{
+                    position: 'absolute',
+                    left: '-26px',
+                    top: '0',
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
                     background: interaction.type === 'STAGE_CHANGE' ? 'var(--secondary)' : 'var(--accent)',
                     border: '4px solid var(--bg-dark)'
                   }}></div>
@@ -166,37 +238,52 @@ const ContactDetail = ({ client_uuid, onBack }) => {
                   </div>
                 </div>
               ))}
-              
-             
-              <div style={{ position: 'relative', marginBottom: '2.5rem' }}>
-                <div style={{ 
-                  position: 'absolute', 
-                  left: '-26px', 
-                  top: '0', 
-                  width: '16px', 
-                  height: '16px', 
-                  borderRadius: '50%', 
-                  background: '#f43f5e',
-                  border: '4px solid var(--bg-dark)'
-                }}></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <h4 style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Mic size={16} color="#f43f5e" /> Audio Note Recorded
-                  </h4>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Just now</span>
-                </div>
-                <div className="card glass" style={{ padding: '1rem', background: 'rgba(244, 63, 94, 0.05)', borderColor: 'rgba(244, 63, 94, 0.2)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                     <button className="btn btn-primary" style={{ padding: '0.5rem', borderRadius: '50%', width: '35px', height: '35px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div style={{ width: 0, height: 0, borderTop: '5px solid transparent', borderBottom: '5px solid transparent', borderLeft: '8px solid white', marginLeft: '2px' }}></div>
-                     </button>
-                     <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', position: 'relative' }}>
-                        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '40%', background: '#f43f5e', borderRadius: '2px' }}></div>
-                     </div>
-                     <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>0:12 / 0:30</span>
+
+
+              {audioNotes && audioNotes.map((audio, idx) => (
+                <div key={audio.id || idx} style={{ position: 'relative', marginBottom: '2.5rem' }}>
+                  <div style={{
+                    position: 'absolute',
+                    left: '-26px',
+                    top: '0',
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    background: '#f43f5e',
+                    border: '4px solid var(--bg-dark)'
+                  }}></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <h4 style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Mic size={16} color="#f43f5e" /> Audio Note Recorded
+                    </h4>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{format(new Date(audio.timestamp), 'MMM dd, HH:mm')}</span>
+                  </div>
+                  <div className="card glass" style={{ padding: '1rem', background: 'rgba(244, 63, 94, 0.05)', borderColor: 'rgba(244, 63, 94, 0.2)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <audio
+                        className="custom-audio-player"
+                        controls
+                        src={URL.createObjectURL(audio.blob)}
+                        style={{
+                          width: '100%',
+                          height: '35px',
+                          borderRadius: '8px'
+                        }}
+                      />
+                      {audio.meta_data && audio.meta_data.transcript ? (
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', borderTop: '1px solid rgba(244, 63, 94, 0.1)', paddingTop: '0.5rem', fontStyle: 'italic' }}>
+                          "{audio.meta_data.transcript.trim()}"
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.85rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', borderTop: '1px solid rgba(244, 63, 94, 0.1)', paddingTop: '0.5rem' }}>
+                          <RefreshCw size={14} className="animate-spin" />
+                          <span>AI Transcribing intent... please wait</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -209,7 +296,7 @@ const ContactDetail = ({ client_uuid, onBack }) => {
           -webkit-text-fill-color: transparent;
         }
       `}</style>
-    </div>
+    </div >
   );
 };
 

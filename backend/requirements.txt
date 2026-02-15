@@ -6,3 +6,8 @@ rapidfuzz
 python-dotenv
 email-validator
 httpx
+openai-whisper
+torch
+setuptools
+numpy
+groq
