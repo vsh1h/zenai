@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db/db";
 import {
@@ -23,10 +23,40 @@ import { format } from 'date-fns';
 const CURRENT_USER_ID = "00000000-0000-0000-0000-000000000000";
 
 const ContactDetail = ({ client_uuid, onBack }) => {
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const [noteText, setNoteText] = useState('');
+
   const lead = useLiveQuery(() => db.leads_local.where('client_uuid').equals(client_uuid).first());
   const interactions = useLiveQuery(() =>
     db.interactions_local.where('lead_uuid').equals(client_uuid).reverse().toArray()
   );
+
+  const handleAddNote = async () => {
+    if (!noteText.trim()) return;
+
+    const timestamp = new Date().toISOString();
+    try {
+      await db.interactions_local.add({
+        client_uuid: crypto.randomUUID(),
+        lead_uuid: client_uuid,
+        type: 'MANUAL_NOTE',
+        note: noteText.trim(),
+        timestamp,
+        sync_status: 'pending'
+      });
+
+      // Also update the lead's timestamp to show it was recently interacted with
+      await db.leads_local.where('client_uuid').equals(client_uuid).modify({
+        timestamp
+      });
+
+      setNoteText('');
+      setIsAddingNote(false);
+      console.log("✅ Note added and queued for sync");
+    } catch (err) {
+      console.error("❌ Failed to add note:", err);
+    }
+  };
   const audioNotes = useLiveQuery(() =>
     db.media_local.where('client_uuid').equals(client_uuid).reverse().toArray()
   );
@@ -34,16 +64,16 @@ const ContactDetail = ({ client_uuid, onBack }) => {
   if (!lead) return <div className="card glass">Loading Lead Intelligence...</div>;
 
   return (
-    <div className="animate-fade-in">
-      <button onClick={onBack} className="btn btn-secondary" style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+    <div className="contact-detail-page animate-fade-in">
+      <button onClick={onBack} className="btn btn-secondary back-btn" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <ChevronLeft size={18} /> Back to Pipeline
       </button>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
-        {/* Left Column: Profile */}
+      <div className="contact-detail-grid">
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div className="card glass" style={{ padding: '2rem', textAlign: 'center' }}>
-            <div style={{
+          <div className="card glass profile-card" style={{ textAlign: 'center' }}>
+            <div className="profile-avatar" style={{
               width: '100px',
               height: '100px',
               borderRadius: '25px',
@@ -154,19 +184,62 @@ const ContactDetail = ({ client_uuid, onBack }) => {
 
         {/* Right Column: Timeline */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div className="card glass" style={{ flex: 1 }}>
+          <div className="card glass timeline-card" style={{ flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <h3 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Interaction <span className="text-gradient">Timeline</span></h3>
-              <button
-                className="btn btn-primary"
-                style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
-                disabled={lead.owner_id !== CURRENT_USER_ID}
-              >
-                Add Note
-              </button>
+              {!isAddingNote ? (
+                <button
+                  className="btn btn-primary"
+                  style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                  disabled={lead.owner_id !== CURRENT_USER_ID}
+                  onClick={() => setIsAddingNote(true)}
+                >
+                  Add Note
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                    onClick={() => { setIsAddingNote(false); setNoteText(''); }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                    onClick={handleAddNote}
+                    disabled={!noteText.trim()}
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div style={{ position: 'relative', paddingLeft: '2rem' }}>
+            {isAddingNote && (
+              <div className="card glass animate-fade-in" style={{ marginBottom: '2.5rem', background: 'rgba(59, 130, 246, 0.05)', borderColor: 'var(--primary)' }}>
+                <textarea
+                  autoFocus
+                  placeholder="Type your interaction note here..."
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  style={{
+                    width: '100%',
+                    minHeight: '100px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'black',
+                    fontSize: '0.95rem',
+                    resize: 'vertical',
+                    padding: '1rem',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+            )}
+
+            <div className="timeline-section" style={{ position: 'relative' }}>
               {/* Timeline Line */}
               <div style={{
                 position: 'absolute',
@@ -228,8 +301,15 @@ const ContactDetail = ({ client_uuid, onBack }) => {
                   }}></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <h4 style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      {interaction.type === 'STAGE_CHANGE' ? <ArrowRightLeft size={16} color="var(--secondary)" /> : <MessageSquare size={16} color="var(--accent)" />}
-                      {interaction.type === 'STAGE_CHANGE' ? 'Pipeline Movement' : 'Activity Log'}
+                      {interaction.type === 'STAGE_CHANGE' ? (
+                        <ArrowRightLeft size={16} color="var(--secondary)" />
+                      ) : interaction.type === 'MANUAL_NOTE' ? (
+                        <MessageSquare size={16} color="var(--primary)" />
+                      ) : (
+                        <MessageSquare size={16} color="var(--accent)" />
+                      )}
+                      {interaction.type === 'STAGE_CHANGE' ? 'Pipeline Movement' :
+                        interaction.type === 'MANUAL_NOTE' ? 'Manual Note' : 'Activity Log'}
                     </h4>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{format(new Date(interaction.timestamp), 'HH:mm')}</span>
                   </div>
@@ -290,6 +370,44 @@ const ContactDetail = ({ client_uuid, onBack }) => {
       </div>
 
       <style>{`
+        .contact-detail-page {
+          padding-bottom: 5rem;
+        }
+
+        .contact-detail-grid {
+          display: grid;
+          grid-template-columns: 350px 1fr;
+          gap: 2rem;
+        }
+
+        .back-btn {
+          margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 1024px) {
+          .contact-detail-grid {
+            grid-template-columns: 1fr;
+          }
+          
+          .profile-card {
+            padding: 1.5rem !important;
+          }
+
+          .profile-avatar {
+            width: 80px !important;
+            height: 80px !important;
+            font-size: 2rem !important;
+          }
+
+          .timeline-card {
+            padding: 1.25rem !important;
+          }
+
+          .timeline-section {
+            padding-left: 1.5rem !important;
+          }
+        }
+
         .text-gradient {
           background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
           -webkit-background-clip: text;

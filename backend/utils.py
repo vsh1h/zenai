@@ -78,3 +78,26 @@ def process_leads_background(new_leads: list[dict]):
             except Exception as e:
                 print(f"[Background] Error processing {lead.get('name') or 'unknown'}: {e}")
 
+def calculate_wealth_metrics(lead_data: dict):
+    # 1. AUA Prediction: Converting ticket sizes to numeric values
+    ticket_map = {
+        "< 10L": 500000, 
+        "10L - 50L": 3000000, 
+        "50L - 1Cr": 7500000, 
+        "> 1Cr": 15000000
+    }
+    predicted_aua = ticket_map.get(lead_data.get("ticket_size"), 0)
+
+    # 2. Investor Readiness Score (0-100)
+    # Weighted logic: Intent (30%), Engagement (40%), Profile Completion (30%)
+    intent_weight = 30 if lead_data.get("intent") == "High" else 15
+    engagement_weight = int(lead_data.get("engagement_score", 1)) * 8  # Max 40
+    profile_weight = 30 if lead_data.get("email") and lead_data.get("phone") else 10
+    
+    readiness_score = intent_weight + engagement_weight + profile_weight
+
+    return {
+        "predicted_aua": predicted_aua,
+        "readiness_score": min(readiness_score, 100)
+    }
+

@@ -12,7 +12,6 @@ db.version(6).stores({
   media_local: '++id, client_uuid, file_name, blob, type, timestamp'
 });
 
-
 db.on('ready', () => {
   return db.settings.get('sync_status').then(res => {
     if (!res) {

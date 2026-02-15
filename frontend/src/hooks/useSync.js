@@ -1,29 +1,28 @@
 import { useEffect } from 'react';
 import { db } from '../db/db';
 
-const BACKEND_URL = "http://127.0.0.1:8000"; // Update with your local IP or deployed URL
+const BACKEND_URL = "https://zenai-8che.onrender.com"; // Update with your local IP or deployed URL
 const CURRENT_USER_ID = "00000000-0000-0000-0000-000000000000";
 
 export function useSync(isOnline) {
   useEffect(() => {
     const syncData = async () => {
-      if (!isOnline) {
-        console.log("☁️ Offline mode: Sync deferred.");
-        return;
-      }
+      if (!isOnline) return;
 
       try {
-        console.log("[Sync Engine] Checking for pending data...");
+        console.log("🔄 [Sync Engine] Checking for pending data...");
 
+        // 1. Fetch pending leads
         const pendingLeads = await db.leads_local
           .where('sync_status')
           .equals('pending')
           .toArray();
 
         if (pendingLeads.length > 0) {
-          console.log(`[Sync Engine] Found ${pendingLeads.length} leads to upload...`);
+          console.log(`📡 [Sync Engine] Found ${pendingLeads.length} leads to upload...`);
           await db.settings.put({ key: 'sync_status', value: 'syncing' });
 
+          // 2. Prepare Payload
           const payload = {
             leads: pendingLeads.map(lead => ({
               id: lead.client_uuid,
@@ -43,13 +42,16 @@ export function useSync(isOnline) {
                 mode: lead.mode,
                 captured_offline: true,
                 company: lead.company || null,
-                role: lead.role || null
+                role: lead.role || null,
+                ticket_size: lead.ticket_size || null,
+                engagement_score: lead.engagement_score || 0,
+                agent_name: lead.agent_name || "Unknown Agent"
               }
             }))
           };
 
-
-          console.log("[Sync Engine] POSTing to", `${BACKEND_URL}/sync`);
+          // 3. Execute Fetch
+          console.log("📤 [Sync Engine] POSTing to", `${BACKEND_URL}/sync`);
           const response = await fetch(`${BACKEND_URL}/sync`, {
             method: 'POST',
             headers: {
@@ -153,7 +155,6 @@ export function useSync(isOnline) {
       }
     };
 
-    // Trigger immediately on online/mount
     syncData();
 
     // Loop every 10 seconds for more real-time feel

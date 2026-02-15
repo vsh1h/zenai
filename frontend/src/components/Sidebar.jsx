@@ -7,15 +7,21 @@ import {
   Settings,
   Database,
   Wifi,
-  WifiOff
+  WifiOff,
+  Mic
 } from 'lucide-react';
 import { db } from '../db/db';
+import { useLiveQuery } from "dexie-react-hooks";
 
 const Sidebar = ({ activeTab, setActiveTab, isOnline }) => {
+  const pendingCount = useLiveQuery(() => db.sync_queue.where('status').equals('pending').count()) || 0;
+  const audioCount = useLiveQuery(() => db.media_local.count()) || 0;
+
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'leads', label: 'All Leads', icon: Users },
+    { id: 'leads', label: 'All Leads', icon: Users, badge: pendingCount > 0 ? pendingCount : null },
     { id: 'add-lead', label: 'New Lead', icon: PlusCircle },
+    { id: 'audio-history', label: 'Recording Vault', icon: Mic, badge: audioCount > 0 ? audioCount : null },
     { id: 'follow-ups', label: 'Schedule', icon: Calendar },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -57,7 +63,19 @@ const Sidebar = ({ activeTab, setActiveTab, isOnline }) => {
               }}
             >
               <Icon size={20} color={isActive ? 'white' : 'var(--primary)'} />
-              <span style={{ fontWeight: isActive ? 700 : 500 }}>{item.label}</span>
+              <span style={{ fontWeight: isActive ? 700 : 500, flex: 1 }}>{item.label}</span>
+              {item.badge && (
+                <span style={{
+                  background: 'var(--warning)',
+                  color: 'white',
+                  fontSize: '0.65rem',
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  fontWeight: 800
+                }}>
+                  {item.badge}
+                </span>
+              )}
             </button>
           );
         })}
@@ -83,10 +101,10 @@ const Sidebar = ({ activeTab, setActiveTab, isOnline }) => {
             onClick={async () => {
               const confirm = window.confirm("This will re-verify all local leads with the server. Proceed?");
               if (confirm) {
-                console.log("🛠️ Hard Sync Reset Triggered...");
-                // Reset all synced/pending leads to pending to force a re-check
+                console.log(" Hard Sync Reset Triggered...");
+
                 await db.leads_local.toCollection().modify({ sync_status: 'pending' });
-                window.location.reload(); // Refresh to trigger hook immediately
+                window.location.reload();
               }
             }}
             className="btn btn-secondary"

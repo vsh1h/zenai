@@ -1,27 +1,18 @@
+
 import React from 'react';
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db/db";
 import {
-  TrendingUp,
-  Users,
-  Zap,
-  CheckCircle2,
-  ArrowRight,
-  MoreVertical,
-  Database,
-  CloudOff,
-  RefreshCw,
-  Monitor,
-  Smartphone,
-  DollarSign,
-  PieChart,
-  Clock
+  TrendingUp, Users, Zap, CheckCircle2, ArrowRight,
+  MoreVertical, Database, CloudOff, RefreshCw,
+  Monitor, Smartphone, DollarSign, PieChart, Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
-
 import SyncStatusPanel from '../components/SyncStatusPanel';
+import AdminLeaderboard from '../components/AdminLeaderboard';
 
-const Dashboard = ({ onViewLead }) => {
+
+const Dashboard = ({ onViewLead, onQuickMode }) => {
   const leads = useLiveQuery(() => db.leads_local.toArray());
   const pendingSync = useLiveQuery(() => db.sync_queue.where('status').equals('pending').count());
   const recentLeads = useLiveQuery(() =>
@@ -44,7 +35,7 @@ const Dashboard = ({ onViewLead }) => {
       value: (() => {
         const wonLeads = leads?.filter(l => l.status === 'Won') || [];
         const totalRevenue = wonLeads.reduce((acc, lead) => acc + (parseFloat(lead.revenue) || 0), 0);
-        const mockCost = 50000; // Mocked cost for ROI visualization
+        const mockCost = 50000;
         const roi = mockCost > 0 ? ((totalRevenue - mockCost) / mockCost) * 100 : 0;
         return `${totalRevenue > 0 ? totalRevenue.toLocaleString() : '0'} L / ${roi.toFixed(1)}%`;
       })(),
@@ -55,54 +46,44 @@ const Dashboard = ({ onViewLead }) => {
 
   return (
     <div className="animate-fade-in">
-      <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <header className="page-header dashboard-header">
         <div>
-          <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', fontWeight: 800 }}>Zen <span className="text-gradient">Dashboard</span></h1>
-          <p style={{ color: 'var(--text-muted)' }}>Real-time offline lead intelligence.</p>
+          <h1 className="title">Zen <span className="text-gradient">Dashboard</span></h1>
+          <p className="subtitle">Real-time offline lead intelligence.</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <div className="card glass" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', borderColor: pendingSync > 0 ? 'var(--warning)' : 'var(--accent)' }}>
+        <div className="header-actions">
+          <div className="card glass sync-badge" style={{ borderColor: pendingSync > 0 ? 'var(--warning)' : 'var(--accent)' }}>
             {pendingSync > 0 ? <CloudOff size={16} color="var(--warning)" /> : <Database size={16} color="var(--accent)" />}
             <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{pendingSync > 0 ? `${pendingSync} Pending Sync` : 'System Synced'}</span>
           </div>
         </div>
       </header>
 
-
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '1.5rem',
-        marginBottom: '3rem'
-      }}>
+      <div className="stats-grid">
         {stats.map((stat, i) => {
           const Icon = stat.icon;
           return (
-            <div key={i} className="card glass" style={{ position: 'relative', overflow: 'hidden' }}>
+            <div key={i} className="card glass stat-card" style={{ position: 'relative', overflow: 'hidden' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', position: 'relative', zIndex: 1 }}>
                 <div style={{
                   background: `rgba(${stat.color === 'var(--primary)' ? '37, 99, 235' : stat.color === 'var(--warning)' ? '217, 119, 6' : stat.color === 'var(--accent)' ? '5, 150, 105' : '79, 70, 229'}, 0.1)`,
-                  padding: '0.75rem',
-                  borderRadius: '12px',
-                  color: stat.color
+                  padding: '0.75rem', borderRadius: '12px', color: stat.color
                 }}>
                   <Icon size={24} />
                 </div>
                 <MoreVertical size={20} color="var(--text-dim)" />
               </div>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 500, position: 'relative', zIndex: 1 }}>{stat.label}</p>
-              <h2 style={{ fontSize: '2rem', marginTop: '0.25rem', fontWeight: 700, position: 'relative', zIndex: 1 }}>{stat.value}</h2>
-              <div style={{ position: 'absolute', right: '-10%', bottom: '-10%', opacity: 0.05 }}>
-                <Icon size={120} />
-              </div>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 500 }}>{stat.label}</p>
+              <h2 style={{ fontSize: '2rem', marginTop: '0.25rem', fontWeight: 700 }}>{stat.value}</h2>
             </div>
           );
         })}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2.2fr 1fr', gap: '2rem' }}>
-        {/* Recent Activity */}
-        <div className="card glass">
+      <AdminLeaderboard />
+
+      <div className="dashboard-main-grid" style={{ marginTop: '2.5rem' }}>
+        <div className="card glass recent-activity">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Recent Interactions</h3>
             <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.5rem 1rem' }}>View Pipeline <ArrowRight size={14} /></button>
@@ -112,88 +93,116 @@ const Dashboard = ({ onViewLead }) => {
             {recentLeads?.length > 0 ? recentLeads.map((lead) => (
               <div key={lead.client_uuid}
                 onClick={() => onViewLead && onViewLead(lead.client_uuid)}
-                style={{
-                  padding: '1.2rem 0',
-                  borderBottom: '1px solid var(--border)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer'
-                }}>
+                style={{ padding: '1.2rem 0', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
-                  <div style={{
-                    width: '45px',
-                    height: '45px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    color: 'white',
-                    fontSize: '1rem'
-                  }}>
+                  <div style={{ width: '45px', height: '45px', borderRadius: '12px', background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'white' }}>
                     {lead.name[0]}
                   </div>
                   <div>
-                    <h4 style={{ fontWeight: 600, fontSize: '1.05rem' }}>{lead.name}</h4>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{lead.phone} • <span style={{ color: 'var(--text-dim)' }}>{lead.intent}</span></p>
+                    <h4 style={{ fontWeight: 600 }}>{lead.name}</h4>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{lead.phone} - <span style={{ color: 'var(--text-dim)' }}>{lead.intent}</span></p>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'flex-end', marginBottom: '0.4rem' }}>
-                    {lead.sync_status === 'pending' && (
-                      <span className="badge" style={{ background: 'var(--warning)', color: 'white', fontSize: '0.6rem', padding: '0.2rem 0.5rem' }}>SYNC PENDING</span>
-                    )}
-                    <span className={`badge badge-${lead.mode === 'stall' ? 'blue' : 'warning'}`} style={{ textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
-                      {lead.mode}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-                    {format(new Date(lead.timestamp), 'MMM dd, HH:mm')}
-                  </p>
+                  <span className={`badge badge-${lead.mode === 'stall' ? 'blue' : 'warning'}`}>{lead.mode}</span>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{format(new Date(lead.timestamp), 'MMM dd, HH:mm')}</p>
                 </div>
               </div>
-            )) : (
-              <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
-                <CloudOff size={48} style={{ color: 'var(--text-dim)', marginBottom: '1rem', opacity: 0.5 }} />
-                <p style={{ color: 'var(--text-dim)' }}>No local leads captured yet.</p>
-              </div>
-            )}
+            )) : <p>No leads found.</p>}
           </div>
         </div>
 
-        {/* Sync Status / Quick Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="dashboard-side-content">
           <SyncStatusPanel />
-
-          <div className="card glass">
+          <div className="card glass quick-actions">
             <h3 style={{ fontSize: '1.1rem', marginBottom: '1.2rem', fontWeight: 600 }}>Quick Mode</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="card glass hover-effect" style={{ padding: '1.2rem', textAlign: 'center', cursor: 'pointer', borderColor: 'var(--border)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+
+              {/* STALL MODE CLICK */}
+              <div
+                className="card glass hover-effect"
+                onClick={() => onQuickMode?.('stall')}
+                style={{ padding: '1.2rem', textAlign: 'center', cursor: 'pointer', borderColor: 'var(--border)' }}
+              >
                 <Monitor size={32} color="var(--primary)" style={{ marginBottom: '0.5rem' }} />
                 <span style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block' }}>Stall</span>
               </div>
-              <div className="card glass hover-effect" style={{ padding: '1.2rem', textAlign: 'center', cursor: 'pointer', borderColor: 'var(--border)' }}>
+
+              {/* FIELD MODE CLICK */}
+              <div
+                className="card glass hover-effect"
+                onClick={() => onQuickMode?.('field')}
+                style={{ padding: '1.2rem', textAlign: 'center', cursor: 'pointer', borderColor: 'var(--border)' }}
+              >
                 <Smartphone size={32} color="var(--warning)" style={{ marginBottom: '0.5rem' }} />
                 <span style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block' }}>Field</span>
               </div>
+
             </div>
           </div>
         </div>
       </div>
 
       <style>{`
+        .dashboard-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          margin-bottom: 2.5rem;
+        }
+
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          gap: 2rem;
+          margin-bottom: 3rem;
+        }
+
+        .dashboard-main-grid {
+          display: grid;
+          grid-template-columns: 2.2fr 1fr;
+          gap: 2.5rem;
+        }
+
+        .dashboard-side-content {
+          display: flex;
+          flex-direction: column;
+          gap: 2rem;
+        }
+
         .hover-effect:hover {
           border-color: var(--primary) !important;
           background: rgba(59, 130, 246, 0.05) !important;
           transform: translateY(-2px);
           transition: all 0.2s ease;
         }
+
         .text-gradient {
-          background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+          background: linear-gradient(135deg, #3B82F6 0%, #6366F1 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
+        }
+
+        @media (max-width: 1024px) {
+          .dashboard-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+          }
+          
+          .dashboard-main-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .stats-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .stats-grid {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
     </div>

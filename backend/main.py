@@ -12,7 +12,7 @@ import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 from models import SyncRequest
 from database import supabase
-from utils import process_leads_background
+from utils import process_leads_background, calculate_wealth_metrics
 
 
 load_dotenv()
@@ -90,7 +90,7 @@ origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -172,6 +172,11 @@ def sync_leads(request: SyncRequest, background_tasks: BackgroundTasks):
                 for field in ["location", "intent", "social_media"]:
                     if value := lead_dump.pop(field, None):
                         meta[field] = value
+                
+                # Calculate wealth metrics
+                combined_data = {**lead_dump, **meta}
+                wealth_metrics = calculate_wealth_metrics(combined_data)
+                meta.update(wealth_metrics)
                 
                 lead_dump["meta_data"] = meta
                 
